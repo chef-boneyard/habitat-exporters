@@ -159,7 +159,6 @@ section() {
 
 # parse the CLI flags and options
 parse_options() {
-  echo "@=$@"
   opts="$(getopt \
     --longoptions help,version,preinst:,postinst:,prerm:,postrm:,conflicts:,provides:,replaces: \
     --name "$program" --options h,V -- "$@" \
@@ -214,9 +213,26 @@ parse_options() {
         ;;
     esac
   done
+
   if [ -z "$pkg" ] || [ "$pkg" = "--" ]; then
     print_help
     exit_with "You must specify a Habitat package." 1
+  fi
+
+  if [ -z "$preinst" ] && [ -e "$(hab pkg path $pkg)/bin/preinst" ]; then
+    preinst="$(hab pkg path $pkg)/bin/preinst"
+  fi
+
+  if [ -z "$postinst" ] && [ -e "$(hab pkg path $pkg)/bin/postinst" ]; then
+    postinst="$(hab pkg path $pkg)/bin/postinst"
+  fi
+
+  if [ -z "$prerm" ] && [ -e "$(hab pkg path $pkg)/bin/prerm" ]; then
+    prerm="$(hab pkg path $pkg)/bin/prerm"
+  fi
+
+  if [ -z "$postrm" ] && [ -e "$(hab pkg path $pkg)/bin/postrm" ]; then
+    postrm="$(hab pkg path $pkg)/bin/postrm"
   fi
 }
 
