@@ -20,15 +20,15 @@ pkg_description="Exports a Debian package from a Habitat package."
 pkg_upstream_url="https://github.com/chef/habitat-exporters"
 
 do_download() {
-  return 0 
+  return 0
 }
 
 do_verify() {
-  return 0 
+  return 0
 }
 
 do_unpack() {
-  return 0 
+  return 0
 }
 
 do_build() {
