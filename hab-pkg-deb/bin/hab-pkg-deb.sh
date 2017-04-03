@@ -36,10 +36,14 @@ postinst=
 prerm=
 postrm=
 conflicts=
+depends=
+debname=
 provides=
 replaces=
 safe_name=
 safe_version=
+priority=
+section=
 
 # defaults for the application
 : ${pkg:="unknown"}
@@ -66,13 +70,17 @@ USAGE:
 FLAGS:
     --help           Prints help information
 OPTIONS:
-    --preinst=FILE   File name of script called before installation
-    --postinst=FILE  File name of script called after installation
-    --prerm=FILE     File name of script called before removal
-    --postrm=FILE    File name of script called after removal
-    --conflicts=PKG  Package that this conflicts with
-    --provides=PKG   Name of facility this package provides
-    --replaces=PKG   Package that this replaces
+    --preinst=FILE      File name of script called before installation
+    --postinst=FILE     File name of script called after installation
+    --prerm=FILE        File name of script called before removal
+    --postrm=FILE       File name of script called after removal
+    --conflicts=PKG     Package with which this conflicts
+    --depends=PKG       Package on which this depends
+    --provides=PKG      Name of facility this package provides
+    --replaces=PKG      Package that this replaces
+    --debname=NAME      Name of Debian package to be built
+    --priority=priority Priority to be assigned to the Debian package
+    --section=section   Section to be assigned to the Debian package
 ARGS:
     <PKG_IDENT>      Habitat package identifier (ex: acme/redis)
 " "$program" "$version" "$author" "$program"
@@ -84,7 +92,7 @@ ARGS:
 # exit_with "Something bad went down" 55
 # ```
 exit_with() {
-  if [ "${HAB_NOCOLORING:-}" = "true" ]; then
+  if [[ "${HAB_NOCOLORING:-}" = "true" ]]; then
     printf -- "ERROR: %s\n" "$1"
   else
     case "${TERM:-}" in
@@ -143,24 +151,30 @@ installed_size() {
 # Can be one of required, important, standard, optional, or extra.
 # See https://www.debian.org/doc/manuals/debian-faq/ch-pkg_basics.en.html#s-priority
 #
-# TODO: Allow customizing this
 priority() {
-  echo extra
+  if [[ ! -z "$priority" ]]; then
+    echo "$priority"
+  else
+    echo extra
+  fi
 }
 
 # The package section.
 #
 # See https://www.debian.org/doc/debian-policy/ch-archive.html#s-subsections
 #
-# TODO: Allow customizing this
 section() {
-  echo misc
+  if [[ ! -z "$section" ]]; then
+    echo "$section"
+  else
+    echo misc
+  fi
 }
 
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,preinst:,postinst:,prerm:,postrm:,conflicts:,provides:,replaces: \
+    --longoptions help,version,preinst:,postinst:,prerm:,postrm:,conflicts:,depends:,provides:,replaces:,debname:,priority:,section: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -193,14 +207,30 @@ parse_options() {
         ;;
       --conflicts)
         conflicts=$2
+	shift 2
+        ;;
+      --depends)
+        depends=$2
         shift 2
         ;;
       --provides)
         provides=$2
-        shift 2
+	shift 2
         ;;
       --replaces)
         replaces=$2
+	shift 2
+        ;;
+      --debname)
+        debname=$2
+        shift 2
+        ;;
+      --priority)
+        priority=$2
+        shift 2
+        ;;
+      --section)
+        section=$2
         shift 2
         ;;
       --)
@@ -214,26 +244,29 @@ parse_options() {
     esac
   done
 
-  if [ -z "$pkg" ] || [ "$pkg" = "--" ]; then
+  if [[ -z "$pkg" ]] || [[ "$pkg" = "--" ]]; then
     print_help
     exit_with "You must specify a Habitat package." 1
   fi
 
   pkg_install_path=$(hab pkg path "$pkg")
 
-  if [ -z "$preinst" ] && [ -e "$pkg_install_path/bin/preinst" ]; then
+  #
+  # If *inst or *rm scripts are included with the package, use them.
+  #
+  if [[ -z "$preinst" ]] && [[ -e "$pkg_install_path/bin/preinst" ]]; then
     preinst="$pkg_install_path/bin/preinst"
   fi
 
-  if [ -z "$postinst" ] && [ -e "$pkg_install_path/bin/postinst" ]; then
+  if [[ -z "$postinst" ]] && [[ -e "$pkg_install_path/bin/postinst" ]]; then
     postinst="$pkg_install_path/bin/postinst"
   fi
 
-  if [ -z "$prerm" ] && [ -e "$pkg_install_path/bin/prerm" ]; then
+  if [[ -z "$prerm" ]] && [[ -e "$pkg_install_path/bin/prerm" ]]; then
     prerm="$pkg_install_path/bin/prerm"
   fi
 
-  if [ -z "$postrm" ] && [ -e "$pkg_install_path/bin/postrm" ]; then
+  if [[ -z "$postrm" ]] && [[ -e "$pkg_install_path/bin/postrm" ]]; then
     postrm="$pkg_install_path/bin/postrm"
   fi
 }
@@ -241,7 +274,11 @@ parse_options() {
 # The name converted to all lowercase to be compatible with Debian naming
 # conventions
 convert_name() {
-  safe_name="${pkg_origin,,}-${pkg_name,,}"
+  if [[ ! -z "$debname" ]]; then
+    safe_name="${debname,,}"
+  else
+    safe_name="${pkg_origin,,}-${pkg_name,,}"
+  fi
 }
 
 # Return the Debian-ready version, replacing all dashes (-) with tildes
@@ -260,67 +297,59 @@ convert_version() {
 	fi
 }
 
+description() {
+  pkg_description="$(head -2 <<< "$manifest" | tail -1)"
+
+  # TODO: Handle multi-line descriptions.
+  # See https://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-Description
+  # Handle empty pkg_description
+  if [[ -z "$pkg_description" ]]; then
+    if [[ ! -z "$debname" ]]; then
+      echo "$debname"
+    else
+      echo "$pkg_name"
+    fi
+  else
+    echo "$pkg_description"
+  fi
+}
+
+maintainer() {
+  pkg_maintainer="$(grep __Maintainer__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
+
+  if [[ -z "$pkg_maintainer" ]]; then
+    echo "$pkg_origin"
+  else
+    echo "$pkg_maintainer"
+  fi
+}
+
 # Output the contents of the "control" file
 render_control_file() {
-# TODO: Depends/conflicts/provides, etc. See https://www.debian.org/doc/debian-policy/ch-relationships.html
-# TODO: Should vendor be the origin or not?
-control=$(cat <<EOF
-Package: $safe_name
-Version: $safe_version-$pkg_release
-Vendor: $pkg_origin
-Architecture: $(architecture)
-Installed-Size: $(installed_size)
-Section: $(section)
-Priority: $(priority)
-EOF
-)
+  hab pkg exec core/handlebars-cmd handlebars \
+    --pkg_name "$safe_name" \
+    --pkg_version "$safe_version" \
+    --pkg_license "$pkg_license" \
+    --pkg_origin "$pkg_origin" \
+    --architecture "$(architecture)" \
+    --maintainer "$(maintainer)" \
+    --installed_size "$(installed_size)" \
+    --section "$(section)" \
+    --priority "$(priority)" \
+    --pkg_upstream_url "$pkg_upstream_url" \
+    --description "$(description)" \
+    --conflicts "$conflicts" \
+    --depends "$depends" \
+    --provides "$provides" \
+    --replaces "$replaces" \
+    < control/control.hbs \
+    > "$staging/DEBIAN/control"
+}
 
-# TODO: Format the description correctly
-# See https://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-Description
-if [[ ! -z $pkg_description ]]; then
-  control="$control
-Description: $pkg_description"
-# Description is required, so just use the package name if we don't have one
-else
-  control="$control
-Description: $pkg_name"
-fi
-
-if [[ ! -z $pkg_upstream_url ]]; then
-  control="$control
-Homepage: $pkg_upstream_url"
-fi
-
-if [[ ! -z $pkg_license ]]; then
-  control="$control
-License: $pkg_license"
-fi
-
-if [[ ! -z $pkg_maintainer ]]; then
-  control="$control
-Maintainer: $pkg_maintainer"
-# Maintainer is required, so use the origin if we don't have one
-else
-  control="$control
-Maintainer: $pkg_origin"
-fi
-
-if [[ ! -z $conflicts ]]; then
-  control="$control
-Conflicts: $conflicts"
-fi
-
-if [[ ! -z $provides ]]; then
-  control="$control
-Provides: $provides"
-fi
-
-if [[ ! -z $replaces ]]; then
-  control="$control
-Replaces: $replaces"
-fi
-
-echo "$control"
+write_conffiles() {
+  if [[ -f "$install_dir/export/deb/conffiles" ]]; then
+    install -v -m 0555 "$install_dir/export/deb/conffiles" "$staging/DEBIAN/conffiles"
+  fi
 }
 
 write_scripts() {
@@ -328,7 +357,7 @@ write_scripts() {
     eval "file_name=\$$script_name"
     if [[ -n $file_name ]]; then
       if [[ -f $file_name ]]; then
-        install -v -m 0755 "$file_name" "$deb_context/DEBIAN/$script_name"
+        install -v -m 0755 "$file_name" "$staging/DEBIAN/$script_name"
       else
         exit_with "$script_name script '$file_name' not found" 1
       fi
@@ -355,26 +384,18 @@ build_deb() {
   echo "$pkg" > "$deb_context"/.hab_pkg
   popd > /dev/null
 
-  mkdir "$deb_context/DEBIAN"
-
-  # Set these variables in advance, since they may or may not be in the manifest,
-  # since they are optional
-  pkg_description=
-  pkg_license=
-  pkg_maintainer=
-  pkg_upstream_url=
+  # Stage the files to be included in the exported .deb package.
+  staging="$($_mktemp_cmd -t -d "${program}-staging-XXXX")"
+  mkdir -p "$staging/hab"
+  mkdir "$staging/DEBIAN"
 
   install_dir="$(hab pkg path "$pkg")"
 
   # Read the manifest to extract variables from it
   manifest="$(cat "$install_dir/MANIFEST")"
 
-  # TODO: Handle multi-line descriptions
-  # FIXME: This probably fail when there's a ":" in them
-  pkg_description="$(grep __Description__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
   pkg_license="$(grep __License__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
-  pkg_maintainer="$(grep __Maintainer__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
-  pkg_upstream_url="$(grep __Upstream\ URL__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
+  pkg_upstream_url="$(grep '__Upstream URL__' <<< "$manifest" | cut -d ":" -f2- | cut -d '(' -f1 | sed 's/[][]//g')"
 
   # Get the ident and the origin and release from that
   ident="$(cat "$install_dir/IDENT")"
@@ -388,16 +409,28 @@ build_deb() {
   convert_version
 
   # Write the control file
-  render_control_file > "$deb_context/DEBIAN/control"
+  render_control_file
 
-  # TODO: Write conffiles file
+  # If user provides a conffiles file in export/deb, it will be installed for inclusion in the exported package.
+  write_conffiles
+
   write_scripts
 
-  render_md5sums > "$deb_context/DEBIAN/md5sums"
+  render_md5sums > "$staging/DEBIAN/md5sums"
 
-  dpkg-deb -z9 -Zgzip --debug --build "$deb_context" \
+  # Copy needed files into staging directory
+  cp -pr "$deb_context/hab/pkgs" "$staging/hab"
+  cp -pr "$deb_context/hab/bin" "$staging/hab"
+
+  dpkg-deb -z9 -Zgzip --debug --build "$staging" \
     "${safe_name}_$safe_version-${pkg_release}_$(architecture).deb"
 }
+
+# The current version of Habitat this program
+version='@version@'
+
+# The author of this program
+author='@author@'
 
 # The short version of the program name which is used in logging output
 program=$(basename "$0")
@@ -406,3 +439,5 @@ find_system_commands
 
 parse_options "$@"
 build_deb
+
+rm -rf "$deb_context" "$staging"
