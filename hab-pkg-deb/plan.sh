@@ -14,6 +14,9 @@ pkg_deps=(
   core/dpkg
   core/findutils
   core/hab
+  core/node
+  core/hab-studio
+  core/handlebars-cmd
 )
 pkg_bin_dirs=(bin)
 pkg_description="Exports a Debian package from a Habitat package."
