@@ -124,6 +124,16 @@ warn() {
   esac
 }
 
+get_script_dir () {
+  SOURCE="${BASH_SOURCE[0]}"
+  while [ -h "$SOURCE" ]; do
+    DIR="$(cd -P "$( dirname "$SOURCE" )" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+  done
+  (cd -P "$(dirname "$SOURCE")" && pwd)
+}
+
 find_system_commands() {
   wtf=$(mktemp --version)
   if mktemp --version 2>&1 | grep -q 'GNU coreutils'; then
@@ -249,25 +259,25 @@ parse_options() {
     exit_with "You must specify a Habitat package." 1
   fi
 
-  pkg_install_path=$(hab pkg path "$pkg")
+  install_dir=$(hab pkg path "$pkg")
 
   #
   # If *inst or *rm scripts are included with the package, use them.
   #
-  if [[ -z "$preinst" ]] && [[ -e "$pkg_install_path/bin/preinst" ]]; then
-    preinst="$pkg_install_path/bin/preinst"
+  if [[ -z "$preinst" ]] && [[ -e "$install_dir/bin/preinst" ]]; then
+    preinst="$install_dir/bin/preinst"
   fi
 
-  if [[ -z "$postinst" ]] && [[ -e "$pkg_install_path/bin/postinst" ]]; then
-    postinst="$pkg_install_path/bin/postinst"
+  if [[ -z "$postinst" ]] && [[ -e "$install_dir/bin/postinst" ]]; then
+    postinst="$install_dir/bin/postinst"
   fi
 
-  if [[ -z "$prerm" ]] && [[ -e "$pkg_install_path/bin/prerm" ]]; then
-    prerm="$pkg_install_path/bin/prerm"
+  if [[ -z "$prerm" ]] && [[ -e "$install_dir/bin/prerm" ]]; then
+    prerm="$install_dir/bin/prerm"
   fi
 
-  if [[ -z "$postrm" ]] && [[ -e "$pkg_install_path/bin/postrm" ]]; then
-    postrm="$pkg_install_path/bin/postrm"
+  if [[ -z "$postrm" ]] && [[ -e "$install_dir/bin/postrm" ]]; then
+    postrm="$install_dir/bin/postrm"
   fi
 }
 
@@ -326,6 +336,11 @@ maintainer() {
 
 # Output the contents of the "control" file
 render_control_file() {
+  control_template="$(get_script_dir)/../control/control"
+  if [[ -f "$install_dir/export/deb/control" ]]; then
+    control_template="$install_dir/export/deb/control"
+  fi
+
   hab pkg exec core/handlebars-cmd handlebars \
     --pkg_name "$safe_name" \
     --pkg_version "$safe_version" \
@@ -342,7 +357,7 @@ render_control_file() {
     --depends "$depends" \
     --provides "$provides" \
     --replaces "$replaces" \
-    < control/control.hbs \
+    < "$control_template" \
     > "$staging/DEBIAN/control"
 }
 
@@ -388,8 +403,6 @@ build_deb() {
   staging="$($_mktemp_cmd -t -d "${program}-staging-XXXX")"
   mkdir -p "$staging/hab"
   mkdir "$staging/DEBIAN"
-
-  install_dir="$(hab pkg path "$pkg")"
 
   # Read the manifest to extract variables from it
   manifest="$(cat "$install_dir/MANIFEST")"

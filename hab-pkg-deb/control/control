@@ -1,10 +1,10 @@
-Package: {{pkg_name}} 
+Package: {{pkg_name}}
 Version: {{pkg_version}}
 {{#if pkg_license~}}
 License: {{pkg_license}}
 {{/if~}}
-Vendor: {{pkg_origin}} 
-Architecture: {{architecture}} 
+Vendor: {{pkg_origin}}
+Architecture: {{architecture}}
 Maintainer: {{{maintainer}}}
 Installed-Size: {{installed_size}}
 Section: {{section}}
@@ -23,5 +23,5 @@ Depends: {{depends}}
 Provides: {{provides}}
 {{/if~}}
 {{#if replaces~}}
-Replaces: {{replaces}} 
+Replaces: {{replaces}}
 {{/if~}}

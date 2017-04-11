@@ -46,4 +46,6 @@ do_build() {
 
 do_install() {
   install -v -D "$pkg_name" "$pkg_prefix/bin/$pkg_name"
+  install -d "$pkg_prefix/control"
+  install -v -D "$PLAN_CONTEXT/control/control" "$pkg_prefix/control"
 }
