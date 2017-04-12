@@ -14,7 +14,6 @@ pkg_deps=(
   core/dpkg
   core/findutils
   core/hab
-  core/node
   core/hab-studio
   core/handlebars-cmd
 )
