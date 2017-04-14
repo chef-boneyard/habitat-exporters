@@ -17,6 +17,7 @@ pkg_deps=(
   core/hab-studio
   core/handlebars-cmd
 )
+pkg_build_deps=(chef/inspec)
 pkg_bin_dirs=(bin)
 pkg_description="Exports a Debian package from a Habitat package."
 pkg_upstream_url="https://github.com/chef/habitat-exporters"
@@ -34,17 +35,27 @@ do_unpack() {
 }
 
 do_build() {
-  cp -v "$PLAN_CONTEXT/bin/$pkg_name.sh" "$pkg_name"
+  install -d "bin"
+  install -v -D "$PLAN_CONTEXT/bin/$pkg_name.sh" bin/"$pkg_name"
+  install -d "export/deb"
+  install -v -D -m 0644 "$PLAN_CONTEXT/export/deb/control" "export/deb"
 
   sed \
     -e "s,#!/bin/bash$,#!$(pkg_path_for bash)/bin/bash," \
     -e "s,@author@,$pkg_maintainer,g" \
     -e "s,@version@,$pkg_version/$pkg_release,g" \
-    -i $pkg_name
+    -i "bin/$pkg_name"
+}
+
+do_check() {
+  hab pkg install core/busybox
+  "$PLAN_CONTEXT/tests/setup.sh" "$PWD" "$PLAN_CONTEXT"
+  hab pkg exec chef/inspec inspec exec "$PLAN_CONTEXT/tests/controls"
 }
 
 do_install() {
-  install -v -D "$pkg_name" "$pkg_prefix/bin/$pkg_name"
-  install -d "$pkg_prefix/control"
-  install -v -D "$PLAN_CONTEXT/control/control" "$pkg_prefix/control"
+  install -d "$pkg_prefix/bin"
+  install -v -D "./bin/$pkg_name" "$pkg_prefix/bin/$pkg_name"
+  install -d "$pkg_prefix/export/deb"
+  install -v -D -m 0644 "./export/deb/control" "$pkg_prefix/export/deb"
 }

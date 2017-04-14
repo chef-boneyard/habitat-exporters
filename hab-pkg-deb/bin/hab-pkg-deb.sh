@@ -184,7 +184,7 @@ section() {
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,preinst:,postinst:,prerm:,postrm:,conflicts:,depends:,provides:,replaces:,debname:,priority:,section: \
+    --longoptions help,version,preinst:,postinst:,prerm:,postrm:,conflicts:,depends:,provides:,replaces:,debname:,priority:,section:,testname: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -231,6 +231,10 @@ parse_options() {
         replaces=$2
 	shift 2
         ;;
+      --testname)
+        testname=$2
+	shift 2
+	;;
       --debname)
         debname=$2
         shift 2
@@ -263,6 +267,7 @@ parse_options() {
 
   #
   # If *inst or *rm scripts are included with the package, use them.
+  # The `bin` directory is specified because that is where automate currently drops its install scripts.
   #
   if [[ -z "$preinst" ]] && [[ -e "$install_dir/bin/preinst" ]]; then
     preinst="$install_dir/bin/preinst"
@@ -336,13 +341,13 @@ maintainer() {
 
 # Output the contents of the "control" file
 render_control_file() {
-  control_template="$(get_script_dir)/../control/control"
+  control_template="$(get_script_dir)/../export/deb/control"
   if [[ -f "$install_dir/export/deb/control" ]]; then
     control_template="$install_dir/export/deb/control"
   fi
 
   hab pkg exec core/handlebars-cmd handlebars \
-    --pkg_name "$safe_name" \
+    --deb_name "$safe_name" \
     --pkg_version "$safe_version" \
     --pkg_license "$pkg_license" \
     --pkg_origin "$pkg_origin" \
@@ -400,7 +405,12 @@ build_deb() {
   popd > /dev/null
 
   # Stage the files to be included in the exported .deb package.
-  staging="$($_mktemp_cmd -t -d "${program}-staging-XXXX")"
+  if [[ ! -z "$testname" ]]; then
+    staging="/tmp/test-${program}-${testname}"
+    mkdir "$staging"
+  else
+    staging="$($_mktemp_cmd -t -d "${program}-staging-XXXX")"
+  fi
   mkdir -p "$staging/hab"
   mkdir "$staging/DEBIAN"
 
@@ -408,7 +418,7 @@ build_deb() {
   manifest="$(cat "$install_dir/MANIFEST")"
 
   pkg_license="$(grep __License__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
-  pkg_upstream_url="$(grep '__Upstream URL__' <<< "$manifest" | cut -d ":" -f2- | cut -d '(' -f1 | sed 's/[][]//g')"
+  pkg_upstream_url="$(grep '__Upstream URL__' <<< "$manifest" | cut -d ":" -f2- | cut -d '(' -f1 | sed 's/[][]//g' | sed 's/^[\t ]*//g')"
 
   # Get the ident and the origin and release from that
   ident="$(cat "$install_dir/IDENT")"
@@ -429,14 +439,18 @@ build_deb() {
 
   write_scripts
 
-  render_md5sums > "$staging/DEBIAN/md5sums"
-
   # Copy needed files into staging directory
   cp -pr "$deb_context/hab/pkgs" "$staging/hab"
   cp -pr "$deb_context/hab/bin" "$staging/hab"
 
-  dpkg-deb -z9 -Zgzip --debug --build "$staging" \
-    "${safe_name}_$safe_version-${pkg_release}_$(architecture).deb"
+  # For most testing, it is enough to generate the control file and the contents of the DEBIAN directory without
+  # building the final package.
+  if [[ -z "$testname" ]]; then
+    render_md5sums > "$staging/DEBIAN/md5sums"
+
+    dpkg-deb -z9 -Zgzip --debug --build "$staging" \
+      "${safe_name}_$safe_version-${pkg_release}_$(architecture).deb"
+  fi
 }
 
 # The current version of Habitat this program
@@ -453,4 +467,7 @@ find_system_commands
 parse_options "$@"
 build_deb
 
-rm -rf "$deb_context" "$staging"
+rm -rf "$deb_context"
+if [[ -z "$testname" ]]; then
+  rm -rf "$staging"
+fi

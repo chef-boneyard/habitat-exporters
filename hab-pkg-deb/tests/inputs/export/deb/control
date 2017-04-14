@@ -1,3 +1,4 @@
+This: is a control file provided by a package
 Package: {{pkg_name}}
 Version: {{pkg_version}}
 {{#if pkg_license~}}
