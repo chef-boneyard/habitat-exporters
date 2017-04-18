@@ -70,17 +70,18 @@ USAGE:
 FLAGS:
     --help           Prints help information
 OPTIONS:
-    --preinst=FILE      File name of script called before installation
-    --postinst=FILE     File name of script called after installation
-    --prerm=FILE        File name of script called before removal
-    --postrm=FILE       File name of script called after removal
     --conflicts=PKG     Package with which this conflicts
+    --debname=NAME      Name of Debian package to be built
     --depends=PKG       Package on which this depends
+    --postinst=FILE     File name of script called after installation
+    --postrm=FILE       File name of script called after removal
+    --preinst=FILE      File name of script called before installation
+    --prerm=FILE        File name of script called before removal
     --provides=PKG      Name of facility this package provides
     --replaces=PKG      Package that this replaces
-    --debname=NAME      Name of Debian package to be built
-    --priority=priority Priority to be assigned to the Debian package
-    --section=section   Section to be assigned to the Debian package
+    --priority=PRIORITY Priority to be assigned to the Debian package
+    --section=SECTION   Section to be assigned to the Debian package
+    --testname=TESTNAME Test name used to create a staging directory for examination
 ARGS:
     <PKG_IDENT>      Habitat package identifier (ex: acme/redis)
 " "$program" "$version" "$author" "$program"
@@ -184,7 +185,7 @@ section() {
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,preinst:,postinst:,prerm:,postrm:,conflicts:,depends:,provides:,replaces:,debname:,priority:,section:,testname: \
+    --longoptions help,version,conflicts:,debname:,depends:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,section:,testname: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -199,52 +200,52 @@ parse_options() {
         echo "$program $version"
         exit
         ;;
-      --preinst)
-        preinst=$2
+      --conflicts)
+        conflicts=$2
+        shift 2
+        ;;
+      --debname)
+        debname=$2
+        shift 2
+        ;;
+      --depends)
+        depends=$2
         shift 2
         ;;
       --postinst)
         postinst=$2
         shift 2
         ;;
-      --prerm)
-        prerm=$2;
-        shift 2
-        ;;
       --postrm)
         postrm=$2
         shift 2
         ;;
-      --conflicts)
-        conflicts=$2
-	shift 2
-        ;;
-      --depends)
-        depends=$2
+      --preinst)
+        preinst=$2
         shift 2
         ;;
-      --provides)
-        provides=$2
-	shift 2
-        ;;
-      --replaces)
-        replaces=$2
-	shift 2
-        ;;
-      --testname)
-        testname=$2
-	shift 2
-	;;
-      --debname)
-        debname=$2
+      --prerm)
+        prerm=$2;
         shift 2
         ;;
       --priority)
         priority=$2
         shift 2
         ;;
+      --provides)
+        provides=$2
+        shift 2
+        ;;
+      --replaces)
+        replaces=$2
+        shift 2
+        ;;
       --section)
         section=$2
+        shift 2
+        ;;
+      --testname)
+        testname=$2
         shift 2
         ;;
       --)
@@ -405,7 +406,7 @@ build_deb() {
   popd > /dev/null
 
   # Stage the files to be included in the exported .deb package.
-  if [[ ! -z "$testname" ]]; then
+  if [[ ! -z "${testname+x}" ]]; then
     staging="/tmp/test-${program}-${testname}"
     mkdir "$staging"
   else
@@ -445,7 +446,7 @@ build_deb() {
 
   # For most testing, it is enough to generate the control file and the contents of the DEBIAN directory without
   # building the final package.
-  if [[ -z "$testname" ]]; then
+  if [[ -z "${testname+x}" ]]; then
     render_md5sums > "$staging/DEBIAN/md5sums"
 
     dpkg-deb -z9 -Zgzip --debug --build "$staging" \
@@ -468,6 +469,6 @@ parse_options "$@"
 build_deb
 
 rm -rf "$deb_context"
-if [[ -z "$testname" ]]; then
+if [[ -z "${testname+x}" ]]; then
   rm -rf "$staging"
 fi
