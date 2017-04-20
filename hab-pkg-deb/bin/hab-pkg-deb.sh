@@ -70,6 +70,7 @@ USAGE:
 FLAGS:
     --help           Prints help information
 OPTIONS:
+    --archive=FILE      Filename of exported Debian package. Should end in .deb.
     --conflicts=PKG     Package with which this conflicts
     --debname=NAME      Name of Debian package to be built
     --depends=PKG       Package on which this depends
@@ -185,7 +186,7 @@ section() {
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,conflicts:,debname:,depends:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,section:,testname: \
+    --longoptions help,version,archive:,conflicts:,debname:,depends:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,section:,testname: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -199,6 +200,10 @@ parse_options() {
       -V | --version)
         echo "$program $version"
         exit
+        ;;
+      --archive)
+        archive=$2
+        shift 2
         ;;
       --conflicts)
         conflicts=$2
@@ -313,6 +318,15 @@ convert_version() {
 	fi
 }
 
+# The filename to be used for the exported Debian package.
+debfile() {
+  if [[ -z "${archive+x}" ]]; then
+    echo "${safe_name}_$safe_version-${pkg_release}_$(architecture).deb"
+  else
+    echo "$archive"
+  fi
+}
+
 description() {
   pkg_description="$(head -2 <<< "$manifest" | tail -1)"
 
@@ -350,6 +364,7 @@ render_control_file() {
   hab pkg exec core/handlebars-cmd handlebars \
     --deb_name "$safe_name" \
     --pkg_version "$safe_version" \
+    --iteration "$pkg_release" \
     --pkg_license "$pkg_license" \
     --pkg_origin "$pkg_origin" \
     --architecture "$(architecture)" \
@@ -450,7 +465,9 @@ build_deb() {
     render_md5sums > "$staging/DEBIAN/md5sums"
 
     dpkg-deb -z9 -Zgzip --debug --build "$staging" \
-      "${safe_name}_$safe_version-${pkg_release}_$(architecture).deb"
+      "$(debfile)"
+  else
+    printf "%s" "$(debfile)" > "$staging/deb_archive_name"
   fi
 }
 

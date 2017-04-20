@@ -50,3 +50,6 @@ echo 'Test setup for pkg_provides_upstream_url: package provides an upstream url
 
 echo 'Test setup for pkg_provides_description: package provides a description in its plan.sh'
 "$build_dir/bin/hab-pkg-deb" --testname pkg_provides_description core/netcat
+
+echo 'Test setup for cli_provides_archive_name: provide the filename of the exported package via CLI'
+"$build_dir/bin/hab-pkg-deb" --testname cli_provides_archive_name --archive bob.deb core/netcat

@@ -1,5 +1,6 @@
 Package: {{deb_name}}
 Version: {{pkg_version}}
+Iteration: {{iteration}}
 {{#if pkg_license~}}
 License: {{pkg_license}}
 {{/if~}}
