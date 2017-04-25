@@ -49,7 +49,7 @@ do_build() {
 
 do_check() {
   "$PLAN_CONTEXT/tests/setup.sh" "$PWD" "$PLAN_CONTEXT"
-  hab pkg exec chef/inspec inspec exec "$PLAN_CONTEXT/tests/inspec"
+  inspec exec "$PLAN_CONTEXT/tests/inspec"
 }
 
 do_install() {
