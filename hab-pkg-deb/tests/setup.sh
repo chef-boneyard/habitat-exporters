@@ -3,6 +3,7 @@
 build_dir="$1"
 test_dir="$2/tests"
 
+hab pkg install core/busybox
 busybox_pkg_dir=$(hab pkg path core/busybox)
 
 echo 'Test setup noopts: build package with no option overrides'

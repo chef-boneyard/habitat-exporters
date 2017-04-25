@@ -1,0 +1,8 @@
+name: hab-pkg-deb-tests
+title: Habitat Debian exporter tests
+maintainer: Chef Software Inc Engineering Services
+copyright: Chef Software Inc Engineering Services
+copyright_email: eng-services@chef.io
+license: Proprietary, All rights reserved
+summary: Tests for Habitat Debian packager exporter
+version: 0.1.0
