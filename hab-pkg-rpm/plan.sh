@@ -5,12 +5,12 @@ pkg_maintainer="The Habitat Maintainers <humans@habitat.sh>"
 pkg_license=('Apache-2.0')
 pkg_source=nosuchfile.tar.gz
 pkg_deps=(
+  yzl/rpm
   core/bash
   core/coreutils
   core/grep
   core/sed
   core/util-linux
-  core/rpm
   core/findutils
   core/hab
   core/hab-studio
@@ -58,8 +58,8 @@ do_build() {
 # conditions must be true. A) do_check() function has been declared, B) DO_CHECK
 # environment variable exists and set to true, env DO_CHECK=true.
 do_check() {
-  # fill out as we get closer to having something to test
-  return 0
+  "$PLAN_CONTEXT/tests/setup.sh" "$PWD" "$PLAN_CONTEXT"
+  inspec exec "$PLAN_CONTEXT/tests/inspec"
 }
 
 # The default implementation is to run make install on the source files and
