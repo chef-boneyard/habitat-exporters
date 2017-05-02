@@ -14,18 +14,18 @@
 %define _binary_payload <%= compression %>
 
 # Metadata
-Name: <%= name %>
-Version: <%= version %>
-Release: <%= iteration %><%= dist_tag ? dist_tag : '' %>
-Summary:  <%= description.split("\n").first.empty? ? "_" : description.split("\n").first %>
+Name: {{name}} 
+Version: {{version}}
+Release: {{release}}
+Summary: {{{description}}}
 AutoReqProv: no
 BuildRoot: %buildroot
 Prefix: /
-Group: <%= category %>
-License: <%= license %>
-Vendor: <%= vendor %>
-URL: <%= homepage %>
-Packager: <%= maintainer %>
+Group: {{group}}
+License: {{license}}
+Vendor: {{vendor}}
+URL: {{url}} 
+Packager: {{{packager}}}
 <% dependencies.each do |name| -%>
 Requires: <%= name %>
 <% end -%>

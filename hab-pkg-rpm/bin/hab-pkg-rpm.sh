@@ -43,7 +43,7 @@ replaces=
 safe_name=
 safe_version=
 priority=
-section=
+group=
 
 # defaults for the application
 : ${pkg:="unknown"}
@@ -74,7 +74,8 @@ OPTIONS:
     --conflicts=PKG     Package with which this conflicts
     --debname=NAME      Name of Debian package to be built
     --depends=PKG       Package on which this depends
-    --dist_tag=DIST_TAG Distribution name for use in RPM filename.
+    --dist_tag=DIST_TAG Distribution name for use in RPM filename
+    --group=RPMGROUP    Group to be assigned to the RPM package
     --postinst=FILE     File name of script called after installation
     --postrm=FILE       File name of script called after removal
     --preinst=FILE      File name of script called before installation
@@ -82,7 +83,6 @@ OPTIONS:
     --provides=PKG      Name of facility this package provides
     --replaces=PKG      Package that this replaces
     --priority=PRIORITY Priority to be assigned to the Debian package
-    --section=SECTION   Section to be assigned to the Debian package
     --testname=TESTNAME Test name used to create a staging directory for examination
 ARGS:
     <PKG_IDENT>      Habitat package identifier (ex: acme/redis)
@@ -172,22 +172,22 @@ priority() {
   fi
 }
 
-# The package section.
+# The package group.
 #
-# See https://www.debian.org/doc/debian-policy/ch-archive.html#s-subsections
+# See https://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/Packagers_Guide/chap-Packagers_Guide-Spec_File_Reference-Preamble.html
 #
-section() {
-  if [[ ! -z "$section" ]]; then
-    echo "$section"
+group() {
+  if [[ ! -z "$group" ]]; then
+    echo "$group"
   else
-    echo misc
+    echo default
   fi
 }
 
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,archive:,conflicts:,debname:,depends:,dist_tag:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,section:,testname: \
+    --longoptions help,version,archive:,conflicts:,debname:,depends:,dist_tag:,group:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,testname: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -222,6 +222,10 @@ parse_options() {
         dist_tag=$2
         shift 2
 	;;
+      --group)
+        group=$2
+        shift 2
+        ;;
       --postinst)
         postinst=$2
         shift 2
@@ -248,10 +252,6 @@ parse_options() {
         ;;
       --replaces)
         replaces=$2
-        shift 2
-        ;;
-      --section)
-        section=$2
         shift 2
         ;;
       --testname)
@@ -363,6 +363,15 @@ maintainer() {
   fi
 }
 
+release() {
+ # Release: <%= iteration %><%= dist_tag ? dist_tag : '' %>
+  if [[ -z "${dist_tag+x}" ]]; then
+    echo "$pkg_release"
+  else
+    echo "${pkg_release}.${dist_tag}"
+  fi
+}
+
 # Output the contents of the "control" file
 render_spec_file() {
   spec_template="$(get_script_dir)/../export/rpm/spec"
@@ -371,18 +380,19 @@ render_spec_file() {
   fi
 
   hab pkg exec core/handlebars-cmd handlebars \
-    --deb_name "$safe_name" \
-    --pkg_version "$safe_version" \
-    --iteration "$pkg_release" \
-    --pkg_license "$pkg_license" \
-    --pkg_origin "$pkg_origin" \
+    --name "$safe_name" \
+    --version "$safe_version" \
+    --release "$(release)" \
+    --description "$(description)" \
+    --group "$(group)" \
+    --license "$pkg_license" \
+    --vendor "$pkg_origin" \
+    --url "$pkg_upstream_url" \
+    --packager "$(maintainer)" \
     --architecture "$(architecture)" \
-    --maintainer "$(maintainer)" \
     --installed_size "$(installed_size)" \
-    --section "$(section)" \
     --priority "$(priority)" \
     --pkg_upstream_url "$pkg_upstream_url" \
-    --description "$(description)" \
     --conflicts "$conflicts" \
     --depends "$depends" \
     --provides "$provides" \
