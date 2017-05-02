@@ -3,7 +3,7 @@
 # # Usage
 #
 # ```
-# $ hab-pkg-deb [PKG ...]
+# $ hab-pkg-rpm [PKG ...]
 # ```
 #
 # # Synopsis
@@ -13,7 +13,7 @@
 # # License and Copyright
 #
 # ```
-# Copyright: Copyright (c) 2016-2017 Chef Software, Inc.
+# Copyright: Copyright (c) 2017 Chef Software, Inc.
 # License: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -74,6 +74,7 @@ OPTIONS:
     --conflicts=PKG     Package with which this conflicts
     --debname=NAME      Name of Debian package to be built
     --depends=PKG       Package on which this depends
+    --dist_tag=DIST_TAG Distribution name for use in RPM filename.
     --postinst=FILE     File name of script called after installation
     --postrm=FILE       File name of script called after removal
     --preinst=FILE      File name of script called before installation
@@ -155,7 +156,7 @@ find_system_commands() {
 # disk space is given as the integer value of the estimated installed
 # size in bytes, divided by 1024 and rounded up.
 installed_size() {
-  du "$deb_context" --apparent-size --block-size=1024 --summarize | cut -f1
+  du "$rpm_context" --apparent-size --block-size=1024 --summarize | cut -f1
 }
 
 # The package priority.
@@ -186,7 +187,7 @@ section() {
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,archive:,conflicts:,debname:,depends:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,section:,testname: \
+    --longoptions help,version,archive:,conflicts:,debname:,depends:,dist_tag:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,section:,testname: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -217,6 +218,10 @@ parse_options() {
         depends=$2
         shift 2
         ;;
+      --dist_tag)
+        dist_tag=$2
+        shift 2
+	;;
       --postinst)
         postinst=$2
         shift 2
@@ -319,9 +324,13 @@ convert_version() {
 }
 
 # The filename to be used for the exported Debian package.
-debfile() {
+rpmfile() {
   if [[ -z "${archive+x}" ]]; then
-    echo "${safe_name}_$safe_version-${pkg_release}_$(architecture).deb"
+    if [[ -z "${dist_tag+x}" ]]; then
+      echo "${safe_name}-$safe_version-${pkg_release}.$(architecture).rpm"
+    else
+      echo "${safe_name}-$safe_version-${pkg_release}.${dist_tag}.$(architecture).rpm"
+    fi
   else
     echo "$archive"
   fi
@@ -355,10 +364,10 @@ maintainer() {
 }
 
 # Output the contents of the "control" file
-render_control_file() {
-  control_template="$(get_script_dir)/../export/deb/control"
-  if [[ -f "$install_dir/export/deb/control" ]]; then
-    control_template="$install_dir/export/deb/control"
+render_spec_file() {
+  spec_template="$(get_script_dir)/../export/rpm/spec"
+  if [[ -f "$install_dir/export/rpm/spec" ]]; then
+    spec_template="$install_dir/export/rpm/spec"
   fi
 
   hab pkg exec core/handlebars-cmd handlebars \
@@ -378,8 +387,8 @@ render_control_file() {
     --depends "$depends" \
     --provides "$provides" \
     --replaces "$replaces" \
-    < "$control_template" \
-    > "$staging/DEBIAN/control"
+    < "$spec_template" \
+    > "$staging/SPECS/$safe_name.spec"
 }
 
 write_conffiles() {
@@ -402,22 +411,22 @@ write_scripts() {
 }
 
 render_md5sums() {
-  pushd "$deb_context" > /dev/null
+  pushd "$rpm_context" > /dev/null
     find . -type f ! -regex '.*?DEBIAN.*' -exec md5sum {} +
   popd > /dev/null
 }
 
 # The platform architecture.
 architecture() {
-  dpkg --print-architecture
+  rpm --eval "%{_arch}"
 }
 
-build_deb() {
-  deb_context="$($_mktemp_cmd -t -d "${program}-XXXX")"
-  pushd "$deb_context" > /dev/null
+build_rpm() {
+  rpm_context="$($_mktemp_cmd -t -d "${program}-XXXX")"
+  pushd "$rpm_context" > /dev/null
 
-  env PKGS="$pkg" NO_MOUNT=1 hab studio -r "$deb_context" -t bare new
-  echo "$pkg" > "$deb_context"/.hab_pkg
+  env PKGS="$pkg" NO_MOUNT=1 hab studio -r "$rpm_context" -t bare new
+  echo "$pkg" > "$rpm_context"/.hab_pkg
   popd > /dev/null
 
   # Stage the files to be included in the exported .deb package.
@@ -427,8 +436,14 @@ build_deb() {
   else
     staging="$($_mktemp_cmd -t -d "${program}-staging-XXXX")"
   fi
-  mkdir -p "$staging/hab"
-  mkdir "$staging/DEBIAN"
+
+  # Magic RPM directories
+  mkdir "$staging/BUILD"
+  mkdir "$staging/RPMS"
+  mkdir "$staging/SRPMS"
+  mkdir "$staging/SOURCES"
+  mkdir "$staging/SPECS"
+  mkdir "$staging/BUILD/hab"
 
   # Read the manifest to extract variables from it
   manifest="$(cat "$install_dir/MANIFEST")"
@@ -447,8 +462,8 @@ build_deb() {
   convert_name
   convert_version
 
-  # Write the control file
-  render_control_file
+  # Write the spec file
+  render_spec_file
 
   # If user provides a conffiles file in export/deb, it will be installed for inclusion in the exported package.
   write_conffiles
@@ -456,18 +471,14 @@ build_deb() {
   write_scripts
 
   # Copy needed files into staging directory
-  cp -pr "$deb_context/hab/pkgs" "$staging/hab"
-  cp -pr "$deb_context/hab/bin" "$staging/hab"
+  cp -pr "$rpm_context/hab/pkgs" "$staging/BUILD/hab"
+  cp -pr "$rpm_context/hab/bin" "$staging/BUILD/hab"
 
-  # For most testing, it is enough to generate the control file and the contents of the DEBIAN directory without
-  # building the final package.
+  # For most testing, it is enough to generate the spec file and RPM name without building the full package.
   if [[ -z "${testname+x}" ]]; then
-    render_md5sums > "$staging/DEBIAN/md5sums"
-
-    dpkg-deb -z9 -Zgzip --debug --build "$staging" \
-      "$(debfile)"
+    rpmbuild --target "$(architecture)" -bb --buildroot "$staging/BUILD" --define \'_topdir "$staging"\' "$staging/SPECS/$safe_name.spec"
   else
-    printf "%s" "$(debfile)" > "$staging/deb_archive_name"
+    printf "%s" "$(rpmfile)" > "$staging/rpm_name"
   fi
 }
 
@@ -483,9 +494,9 @@ program=$(basename "$0")
 find_system_commands
 
 parse_options "$@"
-build_deb
+build_rpm
 
-rm -rf "$deb_context"
+rm -rf "$rpm_context"
 if [[ -z "${testname+x}" ]]; then
   rm -rf "$staging"
 fi
