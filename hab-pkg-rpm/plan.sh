@@ -5,7 +5,7 @@ pkg_maintainer="The Habitat Maintainers <humans@habitat.sh>"
 pkg_license=('Apache-2.0')
 pkg_source=nosuchfile.tar.gz
 pkg_deps=(
-  yzl/rpm
+  core/rpm
   core/bash
   core/coreutils
   core/grep
