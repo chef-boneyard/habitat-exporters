@@ -8,6 +8,6 @@
 control 'pkg_provides_description' do
   title 'Package provides description in its plan.sh'
   describe file('/tmp/test-hab-pkg-rpm-pkg_provides_description/SPECS/core-netcat.spec') do
-    its('content') { should match('Summary: GNU rewrite of the OpenBSD netcat/nc package') }
+    its('content') { should match('description\nGNU rewrite of the OpenBSD netcat/nc package') }
   end
 end

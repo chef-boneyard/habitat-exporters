@@ -8,6 +8,7 @@
 control 'noopts' do
   title 'Build package with no option overrides'
   describe file('/tmp/test-hab-pkg-rpm-noopts/SPECS/core-busybox.spec') do
+    its('content') { should match('%define _binary_payload gzip') }
     its('content') { should match('Name: core-busybox') }
     its('content') { should match(/Version: \d+\.\d+\.\d+$/) }
     its('content') { should match(/Release: \d{14}$/) }
@@ -17,6 +18,7 @@ control 'noopts' do
     its('content') { should match('Vendor: core') }
     its('content') { should match('URL: upstream project\'s website or home page is not defined') }
     its('content') { should match('Packager: The Habitat Maintainers <humans@habitat.sh>') }
+    its('content') { should match('description\nbusybox') }
 =begin
     its('content') { should match('Architecture: amd64') }
     its('content') { should match('Maintainer: The Habitat Maintainers <humans@habitat.sh>') }

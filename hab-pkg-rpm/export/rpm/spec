@@ -11,13 +11,13 @@
 # Use md5
 %define _binary_filedigest_algorithm 1
 
-%define _binary_payload <%= compression %>
+%define _binary_payload {{compression}}
 
 # Metadata
 Name: {{name}} 
 Version: {{version}}
 Release: {{release}}
-Summary: {{{description}}}
+Summary: {{summary}} 
 AutoReqProv: no
 BuildRoot: %buildroot
 Prefix: /
@@ -37,7 +37,7 @@ Obsoletes: <%= name %>
 <%- end -%>
 <% # RPM rejects descriptions with blank lines (even between content) -%>
 %description
-<%= description.gsub(/^\s*$/, " .") %>
+{{description}}
 
 %prep
 # noop

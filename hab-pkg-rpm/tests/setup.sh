@@ -22,6 +22,8 @@ echo 'Test setup for cli_provides_section: provide group via CLI'
 echo 'Test setup for pkg_provides_upstream_url: package provides an upstream url in its plan.sh'
 "$build_dir/bin/hab-pkg-rpm" --testname pkg_provides_upstream_url core/netcat
 
+echo 'Test setup for cli_provides_compression: provide compression type via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_compression --compression xz core/netcat
 
 <<COMMENT
 echo 'Test setup for pkg_provides_install_scripts: package provides its own install scripts'

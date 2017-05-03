@@ -70,7 +70,8 @@ USAGE:
 FLAGS:
     --help           Prints help information
 OPTIONS:
-    --archive=FILE      Filename of exported Debian package. Should end in .deb.
+    --archive=FILE      Filename of exported RPM package. Should end in .rpm
+    --compression=TYPE  Compression type for RPM; gzip (default), bzip2, or xz
     --conflicts=PKG     Package with which this conflicts
     --debname=NAME      Name of Debian package to be built
     --depends=PKG       Package on which this depends
@@ -150,6 +151,29 @@ find_system_commands() {
   fi
 }
 
+#
+# The type of compression to use for the .rpm.
+#
+compression_type() {
+  if [[ -z "${compression+x}" ]]; then
+    echo gzip
+  else
+    echo "$compression"
+  fi
+}
+
+# The package group.
+#
+# See https://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/Packagers_Guide/chap-Packagers_Guide-Spec_File_Reference-Preamble.html
+#
+group() {
+  if [[ ! -z "$group" ]]; then
+    echo "$group"
+  else
+    echo default
+  fi
+}
+
 # The size of the package when installed.
 #
 # Per http://www.debian.org/doc/debian-policy/ch-controlfields.html, the
@@ -172,22 +196,10 @@ priority() {
   fi
 }
 
-# The package group.
-#
-# See https://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/Packagers_Guide/chap-Packagers_Guide-Spec_File_Reference-Preamble.html
-#
-group() {
-  if [[ ! -z "$group" ]]; then
-    echo "$group"
-  else
-    echo default
-  fi
-}
-
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,archive:,conflicts:,debname:,depends:,dist_tag:,group:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,testname: \
+    --longoptions help,version,archive:,compression:,conflicts:,debname:,depends:,dist_tag:,group:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,testname: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -204,6 +216,10 @@ parse_options() {
         ;;
       --archive)
         archive=$2
+        shift 2
+        ;;
+     --compression)
+        compression=$2
         shift 2
         ;;
       --conflicts)
@@ -380,9 +396,11 @@ render_spec_file() {
   fi
 
   hab pkg exec core/handlebars-cmd handlebars \
+    --compression "$(compression_type)" \
     --name "$safe_name" \
     --version "$safe_version" \
     --release "$(release)" \
+    --summary "${pkg_name,,}" \
     --description "$(description)" \
     --group "$(group)" \
     --license "$pkg_license" \
