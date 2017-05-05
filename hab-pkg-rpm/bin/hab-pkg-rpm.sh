@@ -8,7 +8,7 @@
 #
 # # Synopsis
 #
-# Create a Debian package from a set of Habitat packages.
+# Create an RPM package from a set of Habitat packages.
 #
 # # License and Copyright
 #
@@ -31,15 +31,11 @@
 
 # Default variables
 pkg=
-preinst=
-postinst=
-prerm=
-postrm=
-conflicts=
-depends=
+post=
+postun=
+pre=
+preun=
 debname=
-provides=
-replaces=
 safe_name=
 safe_version=
 priority=
@@ -72,17 +68,17 @@ FLAGS:
 OPTIONS:
     --archive=FILE      Filename of exported RPM package. Should end in .rpm
     --compression=TYPE  Compression type for RPM; gzip (default), bzip2, or xz
-    --conflicts=PKG     Package with which this conflicts
+    --conflicts=PKG     Comma-separated list of packages with which the exported RPM conflicts
     --debname=NAME      Name of Debian package to be built
-    --depends=PKG       Package on which this depends
     --dist_tag=DIST_TAG Distribution name for use in RPM filename
     --group=RPMGROUP    Group to be assigned to the RPM package
+    --obsoletes=PKG     Comma-separated list of packages made obsolete by the exported RPM
     --postinst=FILE     File name of script called after installation
     --postrm=FILE       File name of script called after removal
     --preinst=FILE      File name of script called before installation
     --prerm=FILE        File name of script called before removal
-    --provides=PKG      Name of facility this package provides
-    --replaces=PKG      Package that this replaces
+    --provides=PKG      Comma-separated list of facilities provided by the exported RPM
+    --requires=PKG      Comma-separated list of packages required by the exported RPM
     --priority=PRIORITY Priority to be assigned to the Debian package
     --testname=TESTNAME Test name used to create a staging directory for examination
 ARGS:
@@ -162,6 +158,19 @@ compression_type() {
   fi
 }
 
+#
+# Parse comma-separated list of conflicting packages
+#
+conflicts_list() {
+  if [[ ! -z "${conflicts+x}" ]]; then
+    if [[ "$conflicts" == *,* ]] ; then
+      echo "$conflicts" | sed -n 1'p' | tr ',' '\n' | sed -e 's/^/Conflicts: /'
+    else
+      echo "Conflicts: $conflicts"
+    fi
+  fi
+}
+
 # The package group.
 #
 # See https://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/Packagers_Guide/chap-Packagers_Guide-Spec_File_Reference-Preamble.html
@@ -183,6 +192,19 @@ installed_size() {
   du "$rpm_context" --apparent-size --block-size=1024 --summarize | cut -f1
 }
 
+#
+# Parse comma-separated list of conflicting packages
+#
+obsoletes_list() {
+  if [[ ! -z "${obsoletes+x}" ]]; then
+    if [[ "$obsoletes" == *,* ]] ; then
+      echo "$obsoletes" | sed -n 1'p' | tr ',' '\n' | sed -e 's/^/Obsoletes: /'
+    else
+      echo "Obsoletes: $obsoletes"
+    fi
+  fi
+}
+
 # The package priority.
 #
 # Can be one of required, important, standard, optional, or extra.
@@ -196,10 +218,36 @@ priority() {
   fi
 }
 
+#
+# Parse comma-separated list of provided facilities
+#
+provides_list() {
+  if [[ ! -z "${provides+x}" ]]; then
+    if [[ "$provides" == *,* ]] ; then
+      echo "$provides" | sed -n 1'p' | tr ',' '\n' | sed -e 's/^/Provides: /'
+    else
+      echo "Provides: $provides"
+    fi
+  fi
+}
+
+#
+# Parse comma-separated list of required dependencies
+#
+requires_list() {
+  if [[ ! -z "${requires+x}" ]]; then
+    if [[ "$requires" == *,* ]] ; then
+      echo "$requires" | sed -n 1'p' | tr ',' '\n' | sed -e 's/^/Requires: /'
+    else
+      echo "Requires: $requires"
+    fi
+  fi
+}
+
 # parse the CLI flags and options
 parse_options() {
   opts="$(getopt \
-    --longoptions help,version,archive:,compression:,conflicts:,debname:,depends:,dist_tag:,group:,postinst:,postrm:,preinst:,prerm:,priority:,provides:,replaces:,testname: \
+    --longoptions help,version,archive:,compression:,conflicts:,debname:,dist_tag:,group:,obsoletes:,post:,postun:,pre:,preun:,priority:,provides:,requires:,testname: \
     --name "$program" --options h,V -- "$@" \
   )"
   eval set -- "$opts"
@@ -230,10 +278,6 @@ parse_options() {
         debname=$2
         shift 2
         ;;
-      --depends)
-        depends=$2
-        shift 2
-        ;;
       --dist_tag)
         dist_tag=$2
         shift 2
@@ -242,20 +286,24 @@ parse_options() {
         group=$2
         shift 2
         ;;
-      --postinst)
-        postinst=$2
+      --obsoletes)
+        obsoletes=$2
         shift 2
         ;;
-      --postrm)
-        postrm=$2
+      --post)
+        post=$2
         shift 2
         ;;
-      --preinst)
-        preinst=$2
+      --postun)
+        postun=$2
         shift 2
         ;;
-      --prerm)
-        prerm=$2;
+      --pre)
+        pre=$2
+        shift 2
+        ;;
+      --preun)
+        preun=$2;
         shift 2
         ;;
       --priority)
@@ -266,8 +314,8 @@ parse_options() {
         provides=$2
         shift 2
         ;;
-      --replaces)
-        replaces=$2
+      --requires)
+        requires=$2
         shift 2
         ;;
       --testname)
@@ -296,20 +344,20 @@ parse_options() {
   # If *inst or *rm scripts are included with the package, use them.
   # The `bin` directory is specified because that is where automate currently drops its install scripts.
   #
-  if [[ -z "$preinst" ]] && [[ -e "$install_dir/bin/preinst" ]]; then
-    preinst="$install_dir/bin/preinst"
+  if [[ -z "$pre" ]] && [[ -e "$install_dir/bin/pre" ]]; then
+    pre="$install_dir/bin/pre"
   fi
 
-  if [[ -z "$postinst" ]] && [[ -e "$install_dir/bin/postinst" ]]; then
-    postinst="$install_dir/bin/postinst"
+  if [[ -z "$post" ]] && [[ -e "$install_dir/bin/post" ]]; then
+    post="$install_dir/bin/post"
   fi
 
-  if [[ -z "$prerm" ]] && [[ -e "$install_dir/bin/prerm" ]]; then
-    prerm="$install_dir/bin/prerm"
+  if [[ -z "$preun" ]] && [[ -e "$install_dir/bin/preun" ]]; then
+    preun="$install_dir/bin/preun"
   fi
 
-  if [[ -z "$postrm" ]] && [[ -e "$install_dir/bin/postrm" ]]; then
-    postrm="$install_dir/bin/postrm"
+  if [[ -z "$postun" ]] && [[ -e "$install_dir/bin/postun" ]]; then
+    postun="$install_dir/bin/postun"
   fi
 }
 
@@ -411,10 +459,11 @@ render_spec_file() {
     --installed_size "$(installed_size)" \
     --priority "$(priority)" \
     --pkg_upstream_url "$pkg_upstream_url" \
-    --conflicts "$conflicts" \
-    --depends "$depends" \
-    --provides "$provides" \
-    --replaces "$replaces" \
+    --conflicts "$(conflicts_list)" \
+    --requires "$(requires_list)" \
+    --provides "$(provides_list)" \
+    --obsoletes "$(obsoletes_list)" \
+    --scripts "$(script_contents)" \
     < "$spec_template" \
     > "$staging/SPECS/$safe_name.spec"
 }
@@ -425,15 +474,17 @@ write_conffiles() {
   fi
 }
 
-write_scripts() {
-  for script_name in preinst postinst prerm postrm; do
+script_contents() {
+  scripts=
+  for script_name in post postun pre preun; do
     eval "file_name=\$$script_name"
     if [[ -n $file_name ]]; then
       if [[ -f $file_name ]]; then
-        install -v -m 0755 "$file_name" "$staging/DEBIAN/$script_name"
+        scripts+=$(printf "%%%s\n%s\n", "$script_name" "$(<"$file_name")")
       else
         exit_with "$script_name script '$file_name' not found" 1
       fi
+      echo "$scripts"
     fi
   done
 }
@@ -495,8 +546,6 @@ build_rpm() {
 
   # If user provides a conffiles file in export/deb, it will be installed for inclusion in the exported package.
   write_conffiles
-
-  write_scripts
 
   # Copy needed files into staging directory
   cp -pr "$rpm_context/hab/pkgs" "$staging/BUILD/hab"

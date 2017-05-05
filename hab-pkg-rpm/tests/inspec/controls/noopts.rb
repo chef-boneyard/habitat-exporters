@@ -18,7 +18,16 @@ control 'noopts' do
     its('content') { should match('Vendor: core') }
     its('content') { should match('URL: upstream project\'s website or home page is not defined') }
     its('content') { should match('Packager: The Habitat Maintainers <humans@habitat.sh>') }
+    its('content') { should_not match(/^Requires: .*/) }
+    its('content') { should_not match(/^Conflicts: .*/) }
+    its('content') { should_not match(/^Obsoletes: .*/) }
+    its('content') { should_not match(/^Provides: .*/) }
+    its('content') { should_not match(/^%post/) }
+    its('content') { should_not match(/^%postun/) }
+    its('content') { should_not match(/^%pre$/) }
+    its('content') { should_not match(/^%preun/) }
     its('content') { should match('description\nbusybox') }
+
 =begin
     its('content') { should match('Architecture: amd64') }
     its('content') { should match('Maintainer: The Habitat Maintainers <humans@habitat.sh>') }

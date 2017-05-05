@@ -26,15 +26,18 @@ License: {{license}}
 Vendor: {{vendor}}
 URL: {{url}} 
 Packager: {{{packager}}}
-<% dependencies.each do |name| -%>
-Requires: <%= name %>
-<% end -%>
-<% conflicts.each do |name| -%>
-Conflicts: <%= name %>
-<% end -%>
-<% replaces.each do |name| -%>
-Obsoletes: <%= name %>
-<%- end -%>
+{{#if requires~}}
+{{requires}}
+{{/if~}}
+{{#if conflicts~}}
+{{conflicts}}
+{{/if~}}
+{{#if obsoletes~}}
+{{obsoletes}}
+{{/if~}}
+{{#if provides~}}
+{{provides}}
+{{/if~}}
 <% # RPM rejects descriptions with blank lines (even between content) -%>
 %description
 {{description}}
@@ -51,11 +54,9 @@ Obsoletes: <%= name %>
 %clean
 # noop
 
-<% scripts.each do |name, contents| -%>
-%<%= name %>
-<%= contents %>
-<% end -%>
-
+{{#if scripts~}}
+{{scripts}}
+{{/if~}}
 %files
 %defattr(-,<%= user %>,<%= group %>,-)
 <% # Output config files and then regular files -%>

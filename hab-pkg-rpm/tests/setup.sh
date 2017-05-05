@@ -3,9 +3,12 @@
 build_dir="$1"
 test_dir="$2/tests"
 
+set -eu
+
 hab pkg install core/busybox
 busybox_pkg_dir=$(hab pkg path core/busybox)
 hab pkg install core/netcat
+netcat_pkg_dir=$(hab pkg path core/netcat)
 
 echo 'Test setup noopts: build package with no option overrides'
 "$build_dir/bin/hab-pkg-rpm" --testname noopts core/busybox
@@ -25,7 +28,39 @@ echo 'Test setup for pkg_provides_upstream_url: package provides an upstream url
 echo 'Test setup for cli_provides_compression: provide compression type via CLI'
 "$build_dir/bin/hab-pkg-rpm" --testname cli_provides_compression --compression xz core/netcat
 
-<<COMMENT
+echo 'Test setup for cli_provides_single_requires: provide single required package via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_single_requires --requires somepackage core/netcat
+
+echo 'Test setup for cli_provides_multiple_requires: provide multiple required packages via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_multiple_requires --requires "somepackage == 1.0.0,someotherpackage < 1.0.0" core/netcat
+
+echo 'Test setup for cli_provides_single_conflicts: provide single conflicting package via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_single_conflicts --conflicts conflictingpackage core/netcat
+
+echo 'Test setup for cli_provides_multiple_conflicts: provide multiple conflicting packages via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_multiple_conflicts --conflicts "conflictingpackage == 1.0.0,someotherconflictingpackage < 1.0.0" core/netcat
+
+echo 'Test setup for cli_provides_single_obsoletes: provide single obsoleted package via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_single_obsoletes --obsoletes obsoletedpackage core/netcat
+
+echo 'Test setup for cli_provides_multiple_obsoletes: provide multiple obsoleted packages via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_multiple_obsoletes --obsoletes "obsoletedpackage == 1.0.0,otherobsoletedpackage < 1.0.0" core/netcat
+
+echo 'Test setup for cli_provides_single_provides: provide single capability via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_single_provides --provides capability core/netcat
+
+echo 'Test setup for cli_provides_multiple_provides: provide multiple capabilities via CLI'
+"$build_dir/bin/hab-pkg-rpm" --testname cli_provides_multiple_provides --provides "capability,anothercapability" core/netcat
+
+echo 'Test setup for pkg_provides_install_scripts: package provides its own install scripts'
+for script in post postun pre preun; do
+  install "$test_dir/inputs/1/$script" "$netcat_pkg_dir/bin"
+  "$build_dir/bin/hab-pkg-rpm" --testname "pkg_provides_$script" core/netcat
+  # Cleanup
+  rm "$netcat_pkg_dir/bin/$script"
+done
+
+<<'COMMENT'
 echo 'Test setup for pkg_provides_install_scripts: package provides its own install scripts'
 for script in postinst postrm preinst prerm; do
   install "$test_dir/inputs/1/$script" "$busybox_pkg_dir/bin"
@@ -38,12 +73,6 @@ echo 'Test setup for install_scripts_via_cli: provide install script via CLI'
 for script in postinst postrm preinst prerm; do
   "$build_dir/bin/hab-pkg-deb" --testname "cli_includes_$script" "--$script" "$test_dir/inputs/2/$script" core/busybox
 done
-
-echo 'Test setup for pkg_relationships_via_cli: provide package relationship via CLI'
-"$build_dir/bin/hab-pkg-deb" --testname conflicts --conflicts snape core/busybox
-"$build_dir/bin/hab-pkg-deb" --testname depends --depends hermione core/busybox
-"$build_dir/bin/hab-pkg-deb" --testname provides --provides harry core/busybox
-"$build_dir/bin/hab-pkg-deb" --testname replaces --replaces draco core/busybox
 
 echo 'Test setup for pkg_name_via_cli: provide exported package name via CLI'
 "$build_dir/bin/hab-pkg-deb" --testname "set_debname" --debname hogwarts core/busybox
