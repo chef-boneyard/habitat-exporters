@@ -60,19 +60,12 @@ for script in post postun pre preun; do
   rm "$netcat_pkg_dir/bin/$script"
 done
 
-<<'COMMENT'
-echo 'Test setup for pkg_provides_install_scripts: package provides its own install scripts'
-for script in postinst postrm preinst prerm; do
-  install "$test_dir/inputs/1/$script" "$busybox_pkg_dir/bin"
-  "$build_dir/bin/hab-pkg-deb" --testname "pkg_provides_$script" core/busybox
-  # Cleanup
-  rm "$busybox_pkg_dir/bin/$script"
+echo 'Test setup for cli_provides_install_scripts: provide install script via CLI'
+for script in post postun pre preun; do
+  "$build_dir/bin/hab-pkg-rpm" --testname "cli_provides_$script" "--$script" "$test_dir/inputs/2/$script" core/netcat
 done
 
-echo 'Test setup for install_scripts_via_cli: provide install script via CLI'
-for script in postinst postrm preinst prerm; do
-  "$build_dir/bin/hab-pkg-deb" --testname "cli_includes_$script" "--$script" "$test_dir/inputs/2/$script" core/busybox
-done
+<<'COMMENT'
 
 echo 'Test setup for pkg_name_via_cli: provide exported package name via CLI'
 "$build_dir/bin/hab-pkg-deb" --testname "set_debname" --debname hogwarts core/busybox
