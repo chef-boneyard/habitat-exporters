@@ -58,11 +58,10 @@ Packager: {{{packager}}}
 {{scripts}}
 {{/if~}}
 %files
-%defattr(-,<%= user %>,<%= group %>,-)
-<% # Output config files and then regular files -%>
-<% config_files.each do |file| -%>
-%config(noreplace) <%= file %>
-<% end -%>
+%defattr(-,{{package_user}},{{package_group}},-)
+{{#if configs~}}
+{{configs}}
+{{/if~}}
 <% # List all files -%>
 <% files.each do |file| -%>
 <%= file %>

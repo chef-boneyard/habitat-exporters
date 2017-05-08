@@ -26,8 +26,9 @@ control 'noopts' do
     its('content') { should_not match(/^%postun/) }
     its('content') { should_not match(/^%pre$/) }
     its('content') { should_not match(/^%preun/) }
+    its('content') { should_not match(/^%config(noreplace)/) }
     its('content') { should match('description\nbusybox') }
-
+    its('content') { should match('%defattr\(-,root,root,-\)') }
 =begin
     its('content') { should match('Architecture: amd64') }
     its('content') { should match('Maintainer: The Habitat Maintainers <humans@habitat.sh>') }

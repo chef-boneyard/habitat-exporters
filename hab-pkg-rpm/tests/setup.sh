@@ -65,6 +65,11 @@ for script in post postun pre preun; do
   "$build_dir/bin/hab-pkg-rpm" --testname "cli_provides_$script" "--$script" "$test_dir/inputs/2/$script" core/netcat
 done
 
+echo 'Test setup for pkg_provides_configs: provide list of config files via package'
+install -d "$netcat_pkg_dir/export"
+install -v -D -m 0644 "$test_dir/inputs/export/rpm/configs" "$netcat_pkg_dir/export/rpm/configs"
+"$build_dir/bin/hab-pkg-rpm" --testname "pkg_provides_configs" core/netcat
+
 <<'COMMENT'
 
 echo 'Test setup for pkg_name_via_cli: provide exported package name via CLI'

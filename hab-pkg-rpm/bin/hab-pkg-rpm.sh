@@ -464,14 +464,25 @@ render_spec_file() {
     --provides "$(provides_list)" \
     --obsoletes "$(obsoletes_list)" \
     --scripts "$(script_contents)" \
+    --configs "$(configs)" \
+    --package_user "$(package_user)" \
+    --package_group "$(package_group)" \
     < "$spec_template" \
     > "$staging/SPECS/$safe_name.spec"
 }
 
-write_conffiles() {
-  if [[ -f "$install_dir/export/deb/conffiles" ]]; then
-    install -v -m 0555 "$install_dir/export/deb/conffiles" "$staging/DEBIAN/conffiles"
+configs() {
+  if [[ -f "$install_dir/export/rpm/configs" ]]; then
+    sed -e 's/^/%config(noreplace) /' "$install_dir/export/rpm/configs"
   fi
+}
+
+package_group() {
+  echo root
+}
+
+package_user() {
+  echo root
 }
 
 script_contents() {
@@ -543,9 +554,6 @@ build_rpm() {
 
   # Write the spec file
   render_spec_file
-
-  # If user provides a conffiles file in export/deb, it will be installed for inclusion in the exported package.
-  write_conffiles
 
   # Copy needed files into staging directory
   cp -pr "$rpm_context/hab/pkgs" "$staging/BUILD/hab"
