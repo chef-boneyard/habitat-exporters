@@ -38,7 +38,7 @@ Packager: {{{packager}}}
 {{#if provides~}}
 {{provides}}
 {{/if~}}
-<% # RPM rejects descriptions with blank lines (even between content) -%>
+
 %description
 {{description}}
 
