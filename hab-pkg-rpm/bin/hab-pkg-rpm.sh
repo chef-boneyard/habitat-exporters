@@ -417,6 +417,49 @@ description() {
   fi
 }
 
+generate_filelist() {
+  # Get a list of all the files in the staging directory.
+  find "$staging/BUILD" | sed -e s#"$staging\/BUILD"## | sed '/^$/d' | sort > "$staging/tmp/hab_filepaths"
+
+  # find directories
+  find "$staging/BUILD" -type d | sed -e s#"$staging\/BUILD"## | sort > "$staging/tmp/hab_dirlist"
+
+  # TODO: how to handle symlinks
+  # find symlinks
+  # find /tmp/test-hab-pkg-rpm-pkg_provides_configs/BUILD -type l > links
+  # sed -e 's/\/tmp\/test-hab-pkg-rpm-pkg_provides_configs\/BUILD//' links > linklist
+
+  # printf "Generating list of filesystem directories to mark\n"
+  comm -12 /src/sorted_filesystem_list "$staging/tmp/hab_dirlist" > "$staging/tmp/filesystem_directories_to_mark"
+
+  # This will hang on OS X because the syntax is different.
+  # for dirname in `cat "$staging/tmp/filesystem_directories_to_mark"`; do
+    # printf "Marking directory owned by filesystem package: %s\n" "$dirname"
+  #  sed -i 's#'"^$dirname$"'#%dir %attr(0755,root,root) '"$dirname"'#' "$staging/tmp/hab_filepaths"
+  # done
+
+  while read -r dirname
+  do
+    sed -i 's#'"^$dirname$"'#%dir %attr(0755,root,root) '"$dirname"'#' "$staging/tmp/hab_filepaths"
+  done < "$staging/tmp/filesystem_directories_to_mark"
+
+  # printf "Generating list of non-filesystem directories to mark\n"
+  comm -23 "$staging/tmp/hab_dirlist" "$staging/tmp/filesystem_directories_to_mark" > "$staging/tmp/normal_directories_to_mark"
+
+  # printf "Generating sed script to mark directories not owned by the filesystem package\n"
+  sed -re 's/^(.*)$/s#\^\1\$#%dir \1#/' "$staging/tmp/normal_directories_to_mark" > "$staging/tmp/sed.script"
+  sed -f "$staging/tmp/sed.script" "$staging/tmp/hab_filepaths" > "$staging/tmp/filelist"
+
+  # This clears config files because we've already declared them.
+  # for filename in `cat /src/tests/inputs/export/rpm/configs`; do
+  #  sed -i '\#'"^$filename$"'#d' "$staging/tmp/filelist"
+  # done
+  while read -r filename
+  do
+    sed -i '\#'"^$filename$"'#d' "$staging/tmp/filelist"
+  done < /src/tests/inputs/export/rpm/configs
+}
+
 maintainer() {
   pkg_maintainer="$(grep __Maintainer__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
 
@@ -469,6 +512,9 @@ render_spec_file() {
     --package_group "$(package_group)" \
     < "$spec_template" \
     > "$staging/SPECS/$safe_name.spec"
+
+  # Append the filelist separately to avoid overflowing the allowable command line length.
+  cat "$staging/tmp/filelist" >> "$staging/SPECS/$safe_name.spec"
 }
 
 configs() {
@@ -534,6 +580,7 @@ build_rpm() {
   mkdir "$staging/SOURCES"
   mkdir "$staging/SPECS"
   mkdir "$staging/BUILD/hab"
+  mkdir "$staging/tmp"
 
   # Read the manifest to extract variables from it
   manifest="$(cat "$install_dir/MANIFEST")"
@@ -552,12 +599,14 @@ build_rpm() {
   convert_name
   convert_version
 
-  # Write the spec file
-  render_spec_file
-
   # Copy needed files into staging directory
   cp -pr "$rpm_context/hab/pkgs" "$staging/BUILD/hab"
   cp -pr "$rpm_context/hab/bin" "$staging/BUILD/hab"
+
+  generate_filelist
+
+  # Write the spec file
+  render_spec_file
 
   # For most testing, it is enough to generate the spec file and RPM name without building the full package.
   if [[ -z "${testname+x}" ]]; then

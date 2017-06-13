@@ -62,7 +62,3 @@ Packager: {{{packager}}}
 {{#if configs~}}
 {{configs}}
 {{/if~}}
-<% # List all files -%>
-<% files.each do |file| -%>
-<%= file %>
-<% end -%>
