@@ -587,6 +587,10 @@ build_rpm() {
 
   pkg_license="$(grep __License__: <<< "$manifest" | cut -d ":" -f2 | sed 's/^ *//g')"
   pkg_upstream_url="$(grep '__Upstream URL__' <<< "$manifest" | cut -d ":" -f2- | cut -d '(' -f1 | sed 's/[][]//g' | sed 's/^[\t ]*//g')"
+   # WIP
+   # if [[ "$pkg_upstream_url" == "upstream project\'s website or home page is not defined" ]] ; then
+   #
+   # fi
 
   # Get the ident and the origin and release from that
   ident="$(cat "$install_dir/IDENT")"
@@ -610,7 +614,9 @@ build_rpm() {
 
   # For most testing, it is enough to generate the spec file and RPM name without building the full package.
   if [[ -z "${testname+x}" ]]; then
-    rpmbuild --target "$(architecture)" -bb --buildroot "$staging/BUILD" --define \'_topdir "$staging"\' "$staging/SPECS/$safe_name.spec"
+    install_options=(--target "$(architecture)" -bb --buildroot "$staging/BUILD" --define \'_topdir "$staging"\' "$staging/SPECS/$safe_name.spec")
+    rpmbuild "${install_options[@]}"
+    cp "$staging/RPMS/$(architecture)/*.rpm" .
   else
     printf "%s" "$(rpmfile)" > "$staging/rpm_name"
   fi
@@ -631,6 +637,6 @@ parse_options "$@"
 build_rpm
 
 rm -rf "$rpm_context"
-if [[ -z "${testname+x}" ]]; then
-  rm -rf "$staging"
-fi
+# if [[ -z "${testname+x}" ]]; then
+#  rm -rf "$staging"
+# fi

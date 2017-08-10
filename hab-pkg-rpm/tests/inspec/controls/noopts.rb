@@ -29,6 +29,11 @@ control 'noopts' do
     its('content') { should_not match(/^%config(noreplace)/) }
     its('content') { should match('description\nbusybox') }
     its('content') { should match('%defattr\(-,root,root,-\)') }
+    its('content') { should match('%dir /hab') }
+    its('content') { should match ('%dir /hab/bin') }
+    its('content') { should match ('%dir /hab/pkgs') }
+    its('content') { should match ('%dir /hab/pkgs/core') }
+    its('content') { should match ('%dir /hab/pkgs/core/busybox') }
 =begin
     its('content') { should match('Architecture: amd64') }
     its('content') { should match('Maintainer: The Habitat Maintainers <humans@habitat.sh>') }
