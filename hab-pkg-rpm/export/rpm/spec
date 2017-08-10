@@ -1,0 +1,64 @@
+# Disable any shell actions, replace them with simply 'true'
+%define __spec_prep_post true
+%define __spec_prep_pre true
+%define __spec_build_post true
+%define __spec_build_pre true
+%define __spec_install_post true
+%define __spec_install_pre true
+%define __spec_clean_post true
+%define __spec_clean_pre true
+
+# Use md5
+%define _binary_filedigest_algorithm 1
+
+%define _binary_payload {{compression}}
+
+# Metadata
+Name: {{name}} 
+Version: {{version}}
+Release: {{release}}
+Summary: {{summary}} 
+AutoReqProv: no
+BuildRoot: %buildroot
+Prefix: /
+Group: {{group}}
+License: {{license}}
+Vendor: {{vendor}}
+URL: {{url}} 
+Packager: {{{packager}}}
+{{#if requires~}}
+{{requires}}
+{{/if~}}
+{{#if conflicts~}}
+{{conflicts}}
+{{/if~}}
+{{#if obsoletes~}}
+{{obsoletes}}
+{{/if~}}
+{{#if provides~}}
+{{provides}}
+{{/if~}}
+
+%description
+{{description}}
+
+%prep
+# noop
+
+%build
+# noop
+
+%install
+# noop
+
+%clean
+# noop
+
+{{#if scripts~}}
+{{scripts}}
+{{/if~}}
+%files
+%defattr(-,{{package_user}},{{package_group}},-)
+{{#if configs~}}
+{{configs}}
+{{/if~}}
